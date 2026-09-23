@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Álbum da Turma - Recordações Coletivas</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        turma: {
+                            50: '#fdf2f4',
+                            100: '#fbe5e9',
+                            200: '#f7ced7',
+                            500: '#9b1c31',
+                            600: '#800020', // Vinho/Bordô da camisa da turma
+                            700: '#67001a',
+                            800: '#520015',
+                            900: '#3d000f',
+                        },
+                        creme: '#FAF7F2'
+                    },
+                    fontFamily: {
+                        handwriting: ['Caveat', 'cursive'],
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .font-handwriting {
+            font-family: 'Caveat', cursive;
+        }
+        .polaroid-shadow {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .filter-sepia { filter: sepia(0.6) contrast(1.1); }
+        .filter-bw { filter: grayscale(1); }
+        .filter-vinho { filter: sepia(0.4) hue-rotate(300deg) saturate(1.5); }
+    </style>
+
+    <!-- Firebase SDK (Version 10.8.0 - Modular CDN) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, updateDoc, doc, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Configuração Pública do Firebase (Demonstração / Banco Compartilhado)
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-demoKeyForTurmaAlbum2026",
+            authDomain: "album-turma-app.firebaseapp.com",
+            projectId: "album-turma-app",
+            storageBucket: "album-turma-app.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Exportar referências globais para uso nas funções tradicionais
+        window.db = db;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.onSnapshot = onSnapshot;
+        window.query = query;
+        window.orderBy = orderBy;
+        window.updateDoc = updateDoc;
+        window.doc = doc;
+        window.arrayUnion = arrayUnion;
+        window.increment = increment;
+
+        // Sinalizar que o Firebase foi inicializado
+        window.dispatchEvent(new Event('firebase-ready'));
+    </script>
+</head>
+<body class="bg-creme text-gray-800 min-h-screen font-sans flex flex-col justify-between">
+
+    <!-- Header -->
+    <header class="bg-turma-600 text-white shadow-lg sticky top-0 z-40 border-b-4 border-turma-800">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-white/10 rounded-lg">
+                    <i data-lucide="camera" class="w-8 h-8 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">Álbum da Turma</h1>
+                    <p class="text-xs text-turma-100">Guarde para sempre as melhores memórias!</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <button onclick="openNoteModal()" class="w-1/2 sm:w-auto bg-turma-700 hover:bg-turma-800 text-white font-bold px-4 py-2.5 rounded-full shadow transition flex items-center justify-center space-x-2 border border-turma-500 text-sm">
+                    <i data-lucide="pen-tool" class="w-4 h-4"></i>
+                    <span>Mural de Recados</span>
+                </button>
+                <button onclick="openModal()" class="w-1/2 sm:w-auto bg-white text-turma-600 hover:bg-turma-50 font-bold px-5 py-2.5 rounded-full shadow transition-all duration-200 flex items-center justify-center space-x-2 transform hover:scale-105 text-sm">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                    <span>Adicionar Foto</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto px-4 py-8 flex-grow w-full">
+
+        <!-- Banner Estatísticas Rápidas -->
+        <div class="mb-6 grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-turma-100 flex items-center gap-3">
+                <div class="p-3 bg-turma-50 rounded-lg text-turma-600">
+                    <i data-lucide="image" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <span id="totalPhotos" class="text-xl font-bold text-gray-800">0</span>
+                    <p class="text-xs text-gray-500">Fotos da Turma</p>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-turma-100 flex items-center gap-3">
+                <div class="p-3 bg-turma-50 rounded-lg text-turma-600">
+                    <i data-lucide="message-square" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <span id="totalNotes" class="text-xl font-bold text-gray-800">0</span>
+                    <p class="text-xs text-gray-500">Recadinhos no Mural</p>
+                </div>
+            </div>
+            <div class="col-span-2 md:col-span-1 bg-white p-4 rounded-xl shadow-sm border border-turma-100 flex items-center gap-3">
+                <div class="p-3 bg-turma-50 rounded-lg text-turma-600">
+                    <i data-lucide="heart" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <span id="totalLikes" class="text-xl font-bold text-gray-800">0</span>
+                    <p class="text-xs text-gray-500">Curtidas Totais</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search e Filtros de Categoria -->
+        <div class="mb-8 flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-turma-100">
+            <div class="relative w-full md:w-80">
+                <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"></i>
+                <input type="text" id="searchInput" oninput="filterCards()" placeholder="Buscar por aluno ou legenda..." class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-turma-600 focus:border-transparent text-sm">
+            </div>
+            
+            <div class="flex items-center space-x-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Filtrar:</span>
+                <button onclick="setTagFilter('all')" class="tag-filter text-xs px-3 py-1.5 rounded-full font-medium bg-turma-600 text-white transition whitespace-nowrap">Todos</button>
+                <button onclick="setTagFilter('amigos')" class="tag-filter text-xs px-3 py-1.5 rounded-full font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition whitespace-nowrap">Amigos</button>
+                <button onclick="setTagFilter('recreio')" class="tag-filter text-xs px-3 py-1.5 rounded-full font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition whitespace-nowrap">Hora do Recreio</button>
+                <button onclick="setTagFilter('passeios')" class="tag-filter text-xs px-3 py-1.5 rounded-full font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition whitespace-nowrap">Passeios</button>
+                <button onclick="setTagFilter('evento')" class="tag-filter text-xs px-3 py-1.5 rounded-full font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition whitespace-nowrap">Eventos</button>
+            </div>
+        </div>
+
+        <!-- Grid de Cards Polaroid -->
+        <div id="galleryGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- Cards gerados via JS em tempo real -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-16">
+            <i data-lucide="image-off" class="w-16 h-16 text-turma-200 mx-auto mb-4"></i>
+            <h3 class="text-lg font-bold text-gray-700">Nenhuma foto encontrada</h3>
+            <p class="text-sm text-gray-500 mt-1">Seja o primeiro a publicar uma foto nesta categoria!</p>
+        </div>
+
+        <!-- Seção: Mural de Recados da Turma -->
+        <section class="mt-16 bg-white p-6 rounded-2xl shadow-sm border border-turma-100">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-xl font-bold text-turma-900 flex items-center gap-2">
+                        <i data-lucide="message-square" class="text-turma-600"></i>
+                        Mural de Recados Coletivo
+                    </h2>
+                    <p class="text-xs text-gray-500">Recados e citações em tempo real de todos os alunos</p>
+                </div>
+                <button onclick="openNoteModal()" class="text-xs font-semibold text-turma-600 hover:text-turma-800 underline">
+                    + Deixar um recado
+                </button>
+            </div>
+
+            <div id="notesContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Recados sincronizados do Firebase -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-6 mt-12">
+        <div class="max-w-6xl mx-auto px-4 text-center text-sm text-gray-500">
+            <p>Anuário Digital da Turma &copy; <span id="year"></span> - Sincronizado para todos em tempo real.</p>
+        </div>
+    </footer>
+
+    <!-- Modal Adicionar Foto -->
+    <div id="addModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-turma-100">
+            
+            <div class="flex justify-between items-center p-5 border-b border-gray-100 bg-turma-50">
+                <h3 class="text-lg font-bold text-turma-900 flex items-center gap-2">
+                    <i data-lucide="plus-square" class="text-turma-600"></i>
+                    Nova Recordação
+                </h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-200 transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <form id="photoForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-4">
+                
+                <!-- Origem da Imagem (Tabs) -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Selecione a Foto</label>
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <button type="button" id="tabGallery" onclick="switchSourceTab('gallery')" class="py-2 text-sm font-medium rounded-lg border border-turma-600 bg-turma-600 text-white flex items-center justify-center gap-2">
+                            <i data-lucide="image" class="w-4 h-4"></i> Galeria
+                        </button>
+                        <button type="button" id="tabCamera" onclick="switchSourceTab('camera')" class="py-2 text-sm font-medium rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center justify-center gap-2">
+                            <i data-lucide="camera" class="w-4 h-4"></i> Tirar Foto
+                        </button>
+                    </div>
+
+                    <!-- Input Galeria -->
+                    <div id="galleryInputContainer" class="block">
+                        <div class="border-2 border-dashed border-gray-300 hover:border-turma-600 rounded-xl p-6 text-center cursor-pointer transition bg-gray-50 hover:bg-turma-50/30" onclick="document.getElementById('fileInput').click()">
+                            <i data-lucide="upload-cloud" class="w-10 h-10 text-gray-400 mx-auto mb-2"></i>
+                            <p class="text-sm text-gray-600 font-medium">Clique para escolher da galeria</p>
+                            <p class="text-xs text-gray-400 mt-1">PNG, JPG ou WEBP</p>
+                            <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+                        </div>
+                    </div>
+
+                    <!-- Camera Live Container -->
+                    <div id="cameraContainer" class="hidden flex-col items-center">
+                        <div class="relative w-full bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center">
+                            <video id="webcam" autoplay playsinline class="w-full h-full object-cover"></video>
+                            <canvas id="photoCanvas" class="hidden"></canvas>
+                        </div>
+                        
+                        <!-- Filtros da Câmera -->
+                        <div class="flex gap-2 my-2 w-full justify-center">
+                            <button type="button" onclick="setCameraFilter('none')" class="text-xs px-2 py-1 rounded bg-gray-200">Normal</button>
+                            <button type="button" onclick="setCameraFilter('filter-sepia')" class="text-xs px-2 py-1 rounded bg-amber-100 text-amber-800">Sépia</button>
+                            <button type="button" onclick="setCameraFilter('filter-bw')" class="text-xs px-2 py-1 rounded bg-gray-800 text-white">P&B</button>
+                            <button type="button" onclick="setCameraFilter('filter-vinho')" class="text-xs px-2 py-1 rounded bg-turma-600 text-white">Tom da Turma</button>
+                        </div>
+
+                        <button type="button" onclick="takeSnapshot()" class="mt-2 bg-turma-600 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-turma-700">
+                            <i data-lucide="aperture" class="w-5 h-5"></i>
+                            Capturar Foto
+                        </button>
+                    </div>
+
+                    <!-- Preview -->
+                    <div id="previewContainer" class="hidden mt-3 relative rounded-xl overflow-hidden border border-gray-200">
+                        <img id="imagePreview" src="" alt="Preview" class="w-full h-48 object-cover">
+                        <button type="button" onclick="clearPreview()" class="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full shadow hover:bg-red-700">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quem está na foto -->
+                <div>
+                    <label for="studentName" class="block text-sm font-semibold text-gray-700 mb-1">Quem está na foto?</label>
+                    <input type="text" id="studentName" required placeholder="Ex: Maria, João e Pedro" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-turma-600 text-sm">
+                </div>
+
+                <!-- Legenda estilo Polaroid -->
+                <div>
+                    <label for="caption" class="block text-sm font-semibold text-gray-700 mb-1">Legenda / Frase Especial</label>
+                    <textarea id="caption" rows="2" required placeholder="Escreva sobre esse dia especial..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-turma-600 text-sm"></textarea>
+                </div>
+
+                <!-- Tag Categorias -->
+                <div>
+                    <label for="photoTag" class="block text-sm font-semibold text-gray-700 mb-1">Categoria</label>
+                    <select id="photoTag" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-turma-600 text-sm bg-white">
+                        <option value="amigos">Amigos</option>
+                        <option value="recreio">Hora do Recreio</option>
+                        <option value="passeios">Passeios</option>
+                        <option value="evento">Eventos</option>
+                    </select>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="pt-4 border-t border-gray-100 flex justify-end gap-3">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 text-sm">Cancelar</button>
+                    <button type="submit" id="saveBtn" class="px-5 py-2 bg-turma-600 hover:bg-turma-700 text-white font-bold rounded-lg shadow text-sm flex items-center gap-2">
+                        <i data-lucide="check" class="w-4 h-4"></i> Publicar para a Turma
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+    <!-- Modal Novo Recado Mural -->
+    <div id="noteModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-turma-100">
+            <div class="flex justify-between items-center p-5 border-b border-gray-100 bg-turma-50">
+                <h3 class="text-lg font-bold text-turma-900 flex items-center gap-2">
+                    <i data-lucide="pen-tool" class="text-turma-600"></i>
+                    Deixar Recado no Mural
+                </h3>
+                <button onclick="closeNoteModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-200 transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <form onsubmit="handleNoteSubmit(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Seu Nome</label>
+                    <input type="text" id="noteAuthor" required placeholder="Ex: Ana Clara" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-turma-600 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Recado / Mensagem</label>
+                    <textarea id="noteText" rows="3" required placeholder="Escreva algo especial para a turma..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-turma-600 text-sm"></textarea>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="closeNoteModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-turma-600 hover:bg-turma-700 text-white font-bold rounded-lg text-sm">Publicar Recado</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Detalhes/Comentários -->
+    <div id="detailModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col md:flex-row overflow-hidden">
+            <div class="md:w-1/2 bg-black flex items-center justify-center p-2 relative">
+                <img id="modalImage" src="" class="max-h-[60vh] md:max-h-full object-contain">
+            </div>
+            <div class="md:w-1/2 p-6 flex flex-col justify-between bg-white">
+                <div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h4 id="modalName" class="font-bold text-gray-900 text-lg"></h4>
+                            <span id="modalDate" class="text-xs text-gray-400"></span>
+                        </div>
+                        <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <p id="modalCaption" class="text-gray-700 font-handwriting text-2xl mb-4 text-turma-800 leading-snug"></p>
+                    
+                    <!-- Seção de Comentários -->
+                    <div class="border-t border-gray-100 pt-3">
+                        <h5 class="text-xs font-bold uppercase text-gray-400 mb-2">Comentários em Tempo Real</h5>
+                        <div id="commentsList" class="space-y-2 max-h-40 overflow-y-auto mb-3 text-sm">
+                            <!-- Comentários via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-3 mt-4 space-y-2">
+                    <form onsubmit="handleAddComment(event)" class="flex gap-2">
+                        <input type="text" id="commentInput" placeholder="Deixe um comentário..." required class="flex-grow px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-turma-600">
+                        <button type="submit" class="bg-turma-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-turma-700">Enviar</button>
+                    </form>
+                    <button onclick="downloadPolaroid()" class="w-full text-center text-xs font-medium text-turma-600 hover:text-turma-800 py-1 border border-turma-200 rounded-lg flex items-center justify-center gap-1">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Baixar Imagem
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Principal -->
+    <script>
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        // Estado Global
+        let photos = [];
+        let notes = [];
+        let activeTag = 'all';
+        let currentStream = null;
+        let selectedImageData = null;
+        let activeCameraFilter = 'none';
+        let currentPhotoIdForModal = null;
+
+        // Aguardar o Firebase Inicializar
+        window.addEventListener('firebase-ready', () => {
+            initFirebaseListeners();
+        });
+
+        // Ouvintes do Firebase em Tempo Real (Realtime Listeners)
+        function initFirebaseListeners() {
+            // Ouvir Coleção de Fotos
+            const photosQuery = window.query(window.collection(window.db, "photos"), window.orderBy("timestamp", "desc"));
+            window.onSnapshot(photosQuery, (snapshot) => {
+                photos = [];
+                snapshot.forEach((doc) => {
+                    photos.push({ id: doc.id, ...doc.data() });
+                });
+                renderGallery();
+                updateStats();
+            }, (error) => {
+                console.log("Modo offline ativado para fotos");
+            });
+
+            // Ouvir Coleção de Recados do Mural
+            const notesQuery = window.query(window.collection(window.db, "notes"), window.orderBy("timestamp", "desc"));
+            window.onSnapshot(notesQuery, (snapshot) => {
+                notes = [];
+                snapshot.forEach((doc) => {
+                    notes.push({ id: doc.id, ...doc.data() });
+                });
+                renderNotes();
+                updateStats();
+            }, (error) => {
+                console.log("Modo offline ativado para recados");
+            });
+        }
+
+        // Renderizar Galeria
+        function renderGallery() {
+            const grid = document.getElementById('galleryGrid');
+            const emptyState = document.getElementById('emptyState');
+            const searchVal = document.getElementById('searchInput').value.toLowerCase();
+
+            const filtered = photos.filter(item => {
+                const matchesTag = activeTag === 'all' || item.tag === activeTag;
+                const matchesSearch = (item.name && item.name.toLowerCase().includes(searchVal)) || 
+                                      (item.caption && item.caption.toLowerCase().includes(searchVal));
+                return matchesTag && matchesSearch;
+            });
+
+            grid.innerHTML = '';
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                filtered.forEach(photo => {
+                    grid.appendChild(createPolaroidCard(photo));
+                });
+            }
+            
+            lucide.createIcons();
+        }
+
+        function createPolaroidCard(photo) {
+            const card = document.createElement('div');
+            card.className = "bg-white p-4 pb-6 rounded-sm polaroid-shadow border border-gray-100 transform hover:-translate-y-2 transition duration-300 relative group flex flex-col justify-between";
+            
+            const tagNames = {
+                amigos: 'Amigos',
+                recreio: 'Hora do Recreio',
+                passeios: 'Passeios',
+                evento: 'Eventos'
+            };
+
+            card.innerHTML = `
+                <div>
+                    <!-- Imagem Polaroid -->
+                    <div class="relative bg-gray-100 aspect-square overflow-hidden mb-4 border border-gray-200 cursor-pointer" onclick="openDetailModal('${photo.id}')">
+                        <img src="${photo.image}" alt="${photo.name}" class="w-full h-full object-cover transition duration-500 group-hover:scale-105 ${photo.filter || ''}">
+                        <div class="absolute top-2 right-2 bg-turma-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-sm">
+                            ${tagNames[photo.tag] || photo.tag}
+                        </div>
+                    </div>
+
+                    <!-- Legenda manuscrita -->
+                    <div class="px-1 text-center mb-3">
+                        <p class="font-handwriting text-2xl text-gray-800 leading-tight">${photo.caption}</p>
+                        <p class="text-xs font-semibold text-turma-600 mt-1">— ${photo.name}</p>
+                    </div>
+                </div>
+
+                <!-- Rodapé Card -->
+                <div class="pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+                    <span class="text-[10px] text-gray-400">${photo.date}</span>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="toggleLike('${photo.id}')" class="flex items-center space-x-1 hover:text-red-500 transition">
+                            <i data-lucide="heart" class="w-4 h-4 ${photo.likes > 0 ? 'fill-red-500 text-red-500' : ''}"></i>
+                            <span class="font-medium">${photo.likes || 0}</span>
+                        </button>
+                        <button onclick="openDetailModal('${photo.id}')" class="flex items-center space-x-1 hover:text-turma-600 transition">
+                            <i data-lucide="message-circle" class="w-4 h-4"></i>
+                            <span class="font-medium">${photo.comments ? photo.comments.length : 0}</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+
+        // Renderizar Mural de Recados
+        function renderNotes() {
+            const container = document.getElementById('notesContainer');
+            container.innerHTML = '';
+            
+            if(notes.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-400 col-span-3 text-center py-4">Nenhum recado ainda. Seja o primeiro a escrever!</p>';
+                return;
+            }
+
+            notes.forEach(note => {
+                const noteCard = document.createElement('div');
+                noteCard.className = "p-4 rounded-xl bg-turma-50/60 border border-turma-100 flex flex-col justify-between shadow-sm";
+                noteCard.innerHTML = `
+                    <p class="font-handwriting text-xl text-turma-900 mb-2">"${note.text}"</p>
+                    <span class="text-xs font-bold text-turma-600 self-end">— ${note.author}</span>
+                `;
+                container.appendChild(noteCard);
+            });
+        }
+
+        // Atualizar Estatísticas
+        function updateStats() {
+            document.getElementById('totalPhotos').textContent = photos.length;
+            document.getElementById('totalNotes').textContent = notes.length;
+            const totalLikes = photos.reduce((acc, curr) => acc + (curr.likes || 0), 0);
+            document.getElementById('totalLikes').textContent = totalLikes;
+        }
+
+        // Curtida no Firebase
+        async function toggleLike(id) {
+            try {
+                const photoRef = window.doc(window.db, "photos", id);
+                await window.updateDoc(photoRef, {
+                    likes: window.increment(1)
+                });
+            } catch (e) {
+                console.error("Erro ao curtir:", e);
+            }
+        }
+
+        // Filtro de Categoria
+        function setTagFilter(tag) {
+            activeTag = tag;
+            document.querySelectorAll('.tag-filter').forEach(btn => {
+                btn.classList.remove('bg-turma-600', 'text-white');
+                btn.classList.add('bg-gray-100', 'text-gray-600');
+            });
+            event.target.classList.remove('bg-gray-100', 'text-gray-600');
+            event.target.classList.add('bg-turma-600', 'text-white');
+            renderGallery();
+        }
+
+        function filterCards() {
+            renderGallery();
+        }
+
+        // Modais
+        function openModal() { document.getElementById('addModal').classList.remove('hidden'); }
+        function closeModal() { document.getElementById('addModal').classList.add('hidden'); stopCamera(); clearPreview(); }
+
+        function openNoteModal() { document.getElementById('noteModal').classList.remove('hidden'); }
+        function closeNoteModal() { document.getElementById('noteModal').classList.add('hidden'); }
+
+        // Publicar Recado no Firebase
+        async function handleNoteSubmit(e) {
+            e.preventDefault();
+            const author = document.getElementById('noteAuthor').value;
+            const text = document.getElementById('noteText').value;
+
+            try {
+                await window.addDoc(window.collection(window.db, "notes"), {
+                    author,
+                    text,
+                    timestamp: Date.now()
+                });
+                closeNoteModal();
+                document.getElementById('noteAuthor').value = '';
+                document.getElementById('noteText').value = '';
+            } catch (e) {
+                alert("Erro ao publicar recado. Tente novamente.");
+            }
+        }
+
+        function switchSourceTab(type) {
+            const galleryCont = document.getElementById('galleryInputContainer');
+            const cameraCont = document.getElementById('cameraContainer');
+            const btnGallery = document.getElementById('tabGallery');
+            const btnCamera = document.getElementById('tabCamera');
+
+            if (type === 'gallery') {
+                galleryCont.classList.remove('hidden');
+                cameraCont.classList.add('hidden');
+                btnGallery.className = "py-2 text-sm font-medium rounded-lg border border-turma-600 bg-turma-600 text-white flex items-center justify-center gap-2";
+                btnCamera.className = "py-2 text-sm font-medium rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center justify-center gap-2";
+                stopCamera();
+            } else {
+                galleryCont.classList.add('hidden');
+                cameraCont.classList.remove('hidden');
+                btnCamera.className = "py-2 text-sm font-medium rounded-lg border border-turma-600 bg-turma-600 text-white flex items-center justify-center gap-2";
+                btnGallery.className = "py-2 text-sm font-medium rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center justify-center gap-2";
+                startCamera();
+            }
+        }
+
+        // Câmera
+        async function startCamera() {
+            const video = document.getElementById('webcam');
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+                video.srcObject = currentStream;
+            } catch (err) {
+                alert("Não foi possível acessar a câmera.");
+            }
+        }
+
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+        }
+
+        function setCameraFilter(filterClass) {
+            const video = document.getElementById('webcam');
+            video.className = `w-full h-full object-cover ${filterClass}`;
+            activeCameraFilter = filterClass;
+        }
+
+        function takeSnapshot() {
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('photoCanvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            selectedImageData = canvas.toDataURL('image/jpeg', 0.8);
+
+            showPreview(selectedImageData);
+            stopCamera();
+            document.getElementById('cameraContainer').classList.add('hidden');
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    selectedImageData = e.target.result;
+                    showPreview(selectedImageData);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function showPreview(src) {
+            const previewCont = document.getElementById('previewContainer');
+            const previewImg = document.getElementById('imagePreview');
+            previewImg.src = src;
+            previewImg.className = `w-full h-48 object-cover ${activeCameraFilter}`;
+            previewCont.classList.remove('hidden');
+        }
+
+        function clearPreview() {
+            selectedImageData = null;
+            document.getElementById('previewContainer').classList.add('hidden');
+            document.getElementById('fileInput').value = '';
+        }
+
+        // Salvar Foto no Firebase
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            if (!selectedImageData) {
+                alert('Escolha ou tire uma foto antes de publicar!');
+                return;
+            }
+
+            const name = document.getElementById('studentName').value;
+            const caption = document.getElementById('caption').value;
+            const tag = document.getElementById('photoTag').value;
+            const saveBtn = document.getElementById('saveBtn');
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Enviando...';
+
+            try {
+                await window.addDoc(window.collection(window.db, "photos"), {
+                    name,
+                    caption,
+                    image: selectedImageData,
+                    tag,
+                    likes: 0,
+                    comments: [],
+                    date: new Date().toLocaleDateString('pt-BR'),
+                    filter: activeCameraFilter !== 'none' ? activeCameraFilter : '',
+                    timestamp: Date.now()
+                });
+
+                closeModal();
+                document.getElementById('photoForm').reset();
+                activeCameraFilter = 'none';
+            } catch (err) {
+                alert("Erro ao publicar no banco de dados. Verifique sua conexão.");
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Publicar para a Turma';
+                lucide.createIcons();
+            }
+        }
+
+        // Modal Detalhes/Comentários
+        function openDetailModal(id) {
+            currentPhotoIdForModal = id;
+            const photo = photos.find(p => p.id === id);
+            if (!photo) return;
+
+            document.getElementById('modalImage').src = photo.image;
+            document.getElementById('modalImage').className = `max-h-[60vh] md:max-h-full object-contain ${photo.filter || ''}`;
+            document.getElementById('modalName').textContent = photo.name;
+            document.getElementById('modalDate').textContent = photo.date;
+            document.getElementById('modalCaption').textContent = photo.caption;
+
+            renderComments(photo.comments || []);
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+            currentPhotoIdForModal = null;
+        }
+
+        function renderComments(comments) {
+            const list = document.getElementById('commentsList');
+            list.innerHTML = '';
+            if (comments.length === 0) {
+                list.innerHTML = '<p class="text-xs text-gray-400 italic">Nenhum comentário ainda. Seja o primeiro!</p>';
+                return;
+            }
+
+            comments.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'bg-gray-50 p-2 rounded border border-gray-100 text-xs text-gray-700';
+                item.textContent = c;
+                list.appendChild(item);
+            });
+        }
+
+        // Enviar Comentário para o Firebase
+        async function handleAddComment(e) {
+            e.preventDefault();
+            const input = document.getElementById('commentInput');
+            const text = input.value.trim();
+            if (!text || !currentPhotoIdForModal) return;
+
+            try {
+                const photoRef = window.doc(window.db, "photos", currentPhotoIdForModal);
+                await window.updateDoc(photoRef, {
+                    comments: window.arrayUnion(text)
+                });
+                
+                input.value = '';
+                // Atualizar modal local
+                const photo = photos.find(p => p.id === currentPhotoIdForModal);
+                if (photo) {
+                    if (!photo.comments) photo.comments = [];
+                    photo.comments.push(text);
+                    renderComments(photo.comments);
+                }
+            } catch (err) {
+                console.error("Erro ao comentar:", err);
+            }
+        }
+
+        function downloadPolaroid() {
+            const photo = photos.find(p => p.id === currentPhotoIdForModal);
+            if (!photo) return;
+
+            const link = document.createElement('a');
+            link.href = photo.image;
+            link.download = `recordacao-${photo.name.toLowerCase().replace(/\s+/g, '-')}.jpg`;
+            link.click();
+        }
+    </script>
+</body>
+</html>
